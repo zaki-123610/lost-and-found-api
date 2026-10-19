@@ -4,6 +4,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set. Add it to your .env file.")
+
+def _require(name: str) -> str:
+    """Return the environment variable `name`, or stop the app if it is missing."""
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"{name} is not set. Add it to your .env file.")
+    return value
+
+
+DATABASE_URL = _require("DATABASE_URL")
+JWT_SECRET_KEY = _require("JWT_SECRET_KEY")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))

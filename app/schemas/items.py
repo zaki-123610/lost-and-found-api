@@ -1,7 +1,14 @@
 from datetime import UTC, date, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 ItemType = Literal["lost", "found"]
 ItemStatus = Literal["open", "recovered"]
@@ -61,3 +68,33 @@ class ItemOut(BaseModel):
     status: ItemStatus
     created_at: datetime
     updated_at: datetime
+
+
+SearchText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
+
+
+class ItemFilters(BaseModel):
+    """Query parameters of GET /items. All filters are optional and combined with AND."""
+
+    type: ItemType | None = None
+    category: ItemCategory | None = None
+    status: ItemStatus | None = None
+    location: SearchText | None = Field(None, description="Part of the location, case-insensitive")
+    q: SearchText | None = Field(None, description="Keyword searched in title and description")
+    date_from: date | None = Field(None, description="Lost/found on or after this date")
+    date_to: date | None = Field(None, description="Lost/found on or before this date")
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def check_date_range(self) -> Self:
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            raise ValueError("date_from must be on or before date_to")
+        return self
+
+
+class ItemList(BaseModel):
+    items: list[ItemOut]
+    total: int
+    page: int
+    page_size: int

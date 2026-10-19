@@ -130,3 +130,23 @@ def update_item(
         {**data, "item_id": item_id},
     ).fetchone()
     return ItemOut.model_validate(row)
+
+
+@router.patch("/{item_id}/recover")
+def recover_item(item_id: int, user_id: CurrentUserId, conn: DbConn) -> ItemOut:
+    """Mark your own report as recovered."""
+    item = _get_owned_item(conn, item_id, user_id)
+    if item["status"] == "recovered":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Item is already marked as recovered",
+        )
+    row = conn.execute(
+        """
+        UPDATE items SET status = 'recovered', updated_at = now()
+        WHERE id = %s
+        RETURNING *
+        """,
+        (item_id,),
+    ).fetchone()
+    return ItemOut.model_validate(row)

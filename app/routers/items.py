@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+import psycopg
+from fastapi import APIRouter, HTTPException, Query, status
 from psycopg import sql
 
 from app.db import DbConn
@@ -46,6 +47,13 @@ def _where_clause(filters: ItemFilters) -> tuple[sql.Composable, list[object]]:
     return sql.SQL("WHERE ") + sql.SQL(" AND ").join(conditions), params
 
 
+def _get_item_or_404(conn: psycopg.Connection, item_id: int) -> dict:
+    item = conn.execute("SELECT * FROM items WHERE id = %s", (item_id,)).fetchone()
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    return item
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_item(item: ItemCreate, user_id: CurrentUserId, conn: DbConn) -> ItemOut:
     """Report a lost or found item. It belongs to the caller and starts as `open`."""
@@ -80,3 +88,9 @@ def list_items(filters: Annotated[ItemFilters, Query()], conn: DbConn) -> ItemLi
         page=filters.page,
         page_size=filters.page_size,
     )
+
+
+@router.get("/{item_id}")
+def get_item(item_id: int, conn: DbConn) -> ItemOut:
+    """Show one item. Public: no token needed."""
+    return ItemOut.model_validate(_get_item_or_404(conn, item_id))

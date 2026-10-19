@@ -3,6 +3,7 @@ from psycopg.errors import UniqueViolation
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db import DbConn
+from app.dependencies import CurrentUserId
 from app.schemas.auth import Token, UserCreate, UserLogin, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,3 +44,15 @@ def login(credentials: UserLogin, conn: DbConn) -> Token:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return Token(access_token=create_access_token(user["id"]))
+
+
+@router.get("/me")
+def read_me(user_id: CurrentUserId, conn: DbConn) -> UserOut:
+    """Return the account that owns the token."""
+    row = conn.execute(
+        "SELECT id, email, created_at FROM users WHERE id = %s",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return UserOut.model_validate(row)

@@ -9,7 +9,6 @@ from app.routers import auth, items
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Create the database tables once, before the server accepts requests."""
     init_db()
     yield
 
@@ -27,5 +26,4 @@ app.include_router(items.router)
 
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
-    """Liveness check. Does not touch the database."""
     return {"status": "ok"}

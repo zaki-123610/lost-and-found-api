@@ -12,13 +12,11 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 
 def _contains(text: str) -> str:
-    """ILIKE pattern matching `text` anywhere, with % and _ taken literally."""
     escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
 
 def _where_clause(filters: ItemFilters) -> tuple[sql.Composable, list[object]]:
-    """Build the WHERE clause for the given filters. Values are always passed as parameters."""
     conditions: list[sql.Composable] = []
     params: list[object] = []
     if filters.type:
@@ -55,7 +53,6 @@ def _get_item_or_404(conn: psycopg.Connection, item_id: int) -> dict:
 
 
 def _get_owned_item(conn: psycopg.Connection, item_id: int, user_id: int) -> dict:
-    """Return the item if the caller owns it: 404 if it doesn't exist, 403 if it isn't theirs."""
     item = _get_item_or_404(conn, item_id)
     if item["user_id"] != user_id:
         raise HTTPException(
@@ -67,7 +64,6 @@ def _get_owned_item(conn: psycopg.Connection, item_id: int, user_id: int) -> dic
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_item(item: ItemCreate, user_id: CurrentUserId, conn: DbConn) -> ItemOut:
-    """Report a lost or found item. It belongs to the caller and starts as `open`."""
     row = conn.execute(
         """
         INSERT INTO items (user_id, type, title, description, category, location, event_date)
@@ -82,7 +78,6 @@ def create_item(item: ItemCreate, user_id: CurrentUserId, conn: DbConn) -> ItemO
 
 @router.get("")
 def list_items(filters: Annotated[ItemFilters, Query()], conn: DbConn) -> ItemList:
-    """Search reported items, newest first. Public: no token needed."""
     where, params = _where_clause(filters)
     total = conn.execute(
         sql.SQL("SELECT count(*) AS total FROM items {}").format(where), params
@@ -103,7 +98,6 @@ def list_items(filters: Annotated[ItemFilters, Query()], conn: DbConn) -> ItemLi
 
 @router.get("/{item_id}")
 def get_item(item_id: int, conn: DbConn) -> ItemOut:
-    """Show one item. Public: no token needed."""
     return ItemOut.model_validate(_get_item_or_404(conn, item_id))
 
 
@@ -111,7 +105,6 @@ def get_item(item_id: int, conn: DbConn) -> ItemOut:
 def update_item(
     item_id: int, changes: ItemUpdate, user_id: CurrentUserId, conn: DbConn
 ) -> ItemOut:
-    """Edit your own report. Only the fields in the body are changed."""
     _get_owned_item(conn, item_id, user_id)
     data = changes.model_dump(exclude_unset=True)
     if not data:
@@ -134,7 +127,6 @@ def update_item(
 
 @router.patch("/{item_id}/recover")
 def recover_item(item_id: int, user_id: CurrentUserId, conn: DbConn) -> ItemOut:
-    """Mark your own report as recovered."""
     item = _get_owned_item(conn, item_id, user_id)
     if item["status"] == "recovered":
         raise HTTPException(

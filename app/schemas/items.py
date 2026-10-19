@@ -13,14 +13,12 @@ from pydantic import (
 
 ItemType = Literal["lost", "found"]
 ItemStatus = Literal["open", "recovered"]
-# A fixed list keeps category filters reliable ("phone" vs "Phones" would never match).
 ItemCategory = Literal[
     "electronics", "documents", "keys", "wallets", "bags", "clothing", "accessories", "other"
 ]
 
 
 def _not_in_future(value: date) -> date:
-    # One day of margin: users east of UTC (Algeria is UTC+1) can be a day ahead of the server.
     if value > datetime.now(UTC).date() + timedelta(days=1):
         raise ValueError("Date cannot be in the future")
     return value
@@ -58,8 +56,6 @@ class ItemCreate(BaseModel):
 
 
 class ItemUpdate(BaseModel):
-    """Body of PATCH /items/{id}. Only the fields that are sent are changed."""
-
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={"examples": [{"title": "Brown leather wallet", "location": "Hydra"}]},
@@ -75,7 +71,6 @@ class ItemUpdate(BaseModel):
     @field_validator("type", "title", "category", "location", "event_date")
     @classmethod
     def not_null(cls, value: object) -> object:
-        # Required columns can be left out of the body, but not set to null.
         if value is None:
             raise ValueError("Cannot be null")
         return value
@@ -99,8 +94,6 @@ SearchText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=
 
 
 class ItemFilters(BaseModel):
-    """Query parameters of GET /items. All filters are optional and combined with AND."""
-
     type: ItemType | None = None
     category: ItemCategory | None = None
     status: ItemStatus | None = None

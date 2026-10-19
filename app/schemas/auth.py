@@ -5,7 +5,6 @@ from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator
 
 from app.core.security import MAX_PASSWORD_BYTES
 
-# Emails are stored lowercase so "Amine@x.com" and "amine@x.com" are the same account.
 Email = Annotated[EmailStr, AfterValidator(str.lower)]
 
 

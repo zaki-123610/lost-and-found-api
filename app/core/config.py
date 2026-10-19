@@ -6,7 +6,6 @@ load_dotenv()
 
 
 def _require(name: str) -> str:
-    """Return the environment variable `name`, or stop the app if it is missing."""
     value = os.getenv(name)
     if not value:
         raise RuntimeError(f"{name} is not set. Add it to your .env file.")

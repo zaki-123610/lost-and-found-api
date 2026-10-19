@@ -11,7 +11,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, conn: DbConn) -> UserOut:
-    """Create an account. Returns the new user, without the password hash."""
     try:
         row = conn.execute(
             """
@@ -31,12 +30,10 @@ def register(user: UserCreate, conn: DbConn) -> UserOut:
 
 @router.post("/login")
 def login(credentials: UserLogin, conn: DbConn) -> Token:
-    """Exchange email and password for a JWT access token."""
     user = conn.execute(
         "SELECT id, password_hash FROM users WHERE email = %s",
         (credentials.email,),
     ).fetchone()
-    # Same error for unknown email and wrong password, so emails can't be probed.
     if user is None or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,7 +45,6 @@ def login(credentials: UserLogin, conn: DbConn) -> Token:
 
 @router.get("/me")
 def read_me(user_id: CurrentUserId, conn: DbConn) -> UserOut:
-    """Return the account that owns the token."""
     row = conn.execute(
         "SELECT id, email, created_at FROM users WHERE id = %s",
         (user_id,),

@@ -1,7 +1,9 @@
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Annotated
 
 import psycopg
+from fastapi import Depends
 from psycopg.rows import dict_row
 
 from app.core.config import DATABASE_URL
@@ -22,6 +24,10 @@ def get_db() -> Iterator[psycopg.Connection]:
     """FastAPI dependency: one connection per request, always closed afterwards."""
     with get_connection() as conn:
         yield conn
+
+
+# Endpoints declare `conn: DbConn` to receive a per-request connection.
+DbConn = Annotated[psycopg.Connection, Depends(get_db)]
 
 
 def init_db() -> None:

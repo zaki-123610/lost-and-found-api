@@ -6,7 +6,7 @@ from psycopg import sql
 
 from app.db import DbConn
 from app.dependencies import CurrentUserId
-from app.schemas.items import ItemCreate, ItemFilters, ItemList, ItemOut
+from app.schemas.items import ItemCreate, ItemFilters, ItemList, ItemOut, ItemUpdate
 
 router = APIRouter(prefix="/items", tags=["items"])
 
@@ -54,6 +54,17 @@ def _get_item_or_404(conn: psycopg.Connection, item_id: int) -> dict:
     return item
 
 
+def _get_owned_item(conn: psycopg.Connection, item_id: int, user_id: int) -> dict:
+    """Return the item if the caller owns it: 404 if it doesn't exist, 403 if it isn't theirs."""
+    item = _get_item_or_404(conn, item_id)
+    if item["user_id"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only modify your own reports",
+        )
+    return item
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_item(item: ItemCreate, user_id: CurrentUserId, conn: DbConn) -> ItemOut:
     """Report a lost or found item. It belongs to the caller and starts as `open`."""
@@ -94,3 +105,28 @@ def list_items(filters: Annotated[ItemFilters, Query()], conn: DbConn) -> ItemLi
 def get_item(item_id: int, conn: DbConn) -> ItemOut:
     """Show one item. Public: no token needed."""
     return ItemOut.model_validate(_get_item_or_404(conn, item_id))
+
+
+@router.patch("/{item_id}")
+def update_item(
+    item_id: int, changes: ItemUpdate, user_id: CurrentUserId, conn: DbConn
+) -> ItemOut:
+    """Edit your own report. Only the fields in the body are changed."""
+    _get_owned_item(conn, item_id, user_id)
+    data = changes.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide at least one field to update",
+        )
+    assignments = sql.SQL(", ").join(
+        sql.SQL("{} = {}").format(sql.Identifier(column), sql.Placeholder(column))
+        for column in data
+    )
+    row = conn.execute(
+        sql.SQL(
+            "UPDATE items SET {}, updated_at = now() WHERE id = %(item_id)s RETURNING *"
+        ).format(assignments),
+        {**data, "item_id": item_id},
+    ).fetchone()
+    return ItemOut.model_validate(row)

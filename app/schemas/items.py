@@ -7,6 +7,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    field_validator,
     model_validator,
 )
 
@@ -54,6 +55,30 @@ class ItemCreate(BaseModel):
     category: ItemCategory
     location: Location
     event_date: EventDate
+
+
+class ItemUpdate(BaseModel):
+    """Body of PATCH /items/{id}. Only the fields that are sent are changed."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"title": "Brown leather wallet", "location": "Hydra"}]},
+    )
+
+    type: ItemType | None = None
+    title: Title | None = None
+    description: Description | None = None
+    category: ItemCategory | None = None
+    location: Location | None = None
+    event_date: EventDate | None = None
+
+    @field_validator("type", "title", "category", "location", "event_date")
+    @classmethod
+    def not_null(cls, value: object) -> object:
+        # Required columns can be left out of the body, but not set to null.
+        if value is None:
+            raise ValueError("Cannot be null")
+        return value
 
 
 class ItemOut(BaseModel):
